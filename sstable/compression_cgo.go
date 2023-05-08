@@ -27,8 +27,23 @@ func decodeZstd(decodedBuf, b []byte) ([]byte, error) {
 // slice, including the `compressedBuf[:varIntLen]` prefix.
 func encodeZstd(compressedBuf []byte, varIntLen int, b []byte) []byte {
 	buf := bytes.NewBuffer(compressedBuf[:varIntLen])
+        ZSTD_CCtx *const zc = ZSTD_createCCtx();
+        ZSTD_DCtx *const zdc = ZSTD_createDCtx();
+	if (threadArgs->benchMode == 1) {
+            QZSTD_startQatDevice();
+            matchState = QZSTD_createSeqProdState();
+            ZSTD_registerSequenceProducer(zc, matchState, qatSequenceProducer);
+        } else {
+            ZSTD_registerSequenceProducer(zc, NULL, NULL);
+        }
 	writer := zstd.NewWriterLevel(buf, 3)
 	writer.Write(b)
 	writer.Close()
+	ZSTD_freeCCtx(zc);
+        ZSTD_freeDCtx(zdc);
+        if (threadArgs->benchMode == 1 && matchState) {
+            QZSTD_freeSeqProdState(matchState);
+            QZSTD_stopQatDevice();
+        }
 	return buf.Bytes()
 }
